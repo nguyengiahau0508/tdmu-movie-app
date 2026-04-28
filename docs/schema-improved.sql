@@ -1,29 +1,18 @@
-# 🗄️ Database Design – Movie Streaming Application (MariaDB)
-## Production-Ready Schema with Advanced Features
+-- ============================================================================
+-- MOVIE STREAMING APPLICATION - IMPROVED DATABASE SCHEMA (MariaDB)
+-- ============================================================================
+-- This is a production-ready schema with:
+-- - Normalized actor/director management
+-- - Subscription & content access control
+-- - Multi-device synchronization
+-- - Audit logging & soft delete
+-- - Optimized indexes
+-- ============================================================================
 
----
+-- ============================================================================
+-- 1. USER MANAGEMENT
+-- ============================================================================
 
-## 📌 Overview
-
-This is a **production-ready** database design built for a scalable movie streaming system that supports:
-
-* ✅ Single movies and TV series with normalized actor/director management
-* ✅ Multi-tier subscription system with content access control
-* ✅ User personalization (watch history, favorites, ratings)
-* ✅ Multi-device synchronization for seamless experience
-* ✅ Audit logging and soft delete for data integrity
-* ✅ Scalable querying optimized for high-traffic features
-
-The schema is optimized for **MariaDB** with comprehensive indexing and is structured into logical modules.
-
----
-
-## 🧩 1. User Management
-
-Handles authentication, user data, role-based access, and multi-device tracking.
-
-### Users Table
-```sql
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -39,17 +28,9 @@ CREATE TABLE users (
     INDEX idx_email (email),
     INDEX idx_username (username),
     INDEX idx_deleted_at (deleted_at)
-);
-```
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-**Key Features:**
-- Soft delete support with `deleted_at`
-- Role-based access control (user, vip, admin)
-- User profile information (avatar, bio)
-- Activity tracking (created_at, updated_at)
-
-### User Devices (Multi-device Sync)
-```sql
+-- User devices for multi-device sync
 CREATE TABLE user_devices (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -65,23 +46,12 @@ CREATE TABLE user_devices (
     INDEX idx_user_id (user_id),
     INDEX idx_device_id (device_id),
     INDEX idx_deleted_at (deleted_at)
-);
-```
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-**Purpose**: Track user devices for:
-- Limiting concurrent streams per subscription tier
-- Resuming playback on different devices
-- Security & activity tracking
-- Device-specific preferences
+-- ============================================================================
+-- 2. SUBSCRIPTION MANAGEMENT
+-- ============================================================================
 
----
-
-## 💳 2. Subscription & Access Control
-
-Multi-tier subscription system with content access control and payment tracking.
-
-### Subscriptions Table (Subscription Plans)
-```sql
 CREATE TABLE subscriptions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(50) NOT NULL,
@@ -89,23 +59,16 @@ CREATE TABLE subscriptions (
     price DECIMAL(10, 2) NOT NULL,
     currency VARCHAR(3) DEFAULT 'USD',
     duration_days INT DEFAULT 30,
-    max_devices INT DEFAULT 1,           -- Concurrent streams
+    max_devices INT DEFAULT 1,
     max_quality ENUM('480p', '720p', '1080p', '4k') DEFAULT '1080p',
     allows_download BOOLEAN DEFAULT FALSE,
     allows_offline BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL,
     INDEX idx_deleted_at (deleted_at)
-);
-```
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-**Example Plans:**
-- Free (no cost, 1 device, 480p, no download)
-- Basic ($4.99/month, 1 device, 720p, download allowed)
-- Premium ($14.99/month, 4 devices, 4K, offline download)
-
-### User Subscriptions (Active Subscription Tracking)
-```sql
+-- User subscriptions - tracks active subscriptions
 CREATE TABLE user_subscriptions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -123,42 +86,12 @@ CREATE TABLE user_subscriptions (
     INDEX idx_is_active (is_active),
     INDEX idx_end_date (end_date),
     INDEX idx_deleted_at (deleted_at)
-);
-```
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-### Content Access Control (Granular Permissions)
-```sql
-CREATE TABLE content_access (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    subscription_id INT,
-    role VARCHAR(50),                    -- 'user', 'vip', 'admin'
-    movie_id INT,
-    can_view BOOLEAN DEFAULT FALSE,
-    can_download BOOLEAN DEFAULT FALSE,
-    max_quality ENUM('480p', '720p', '1080p', '4k') DEFAULT '1080p',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
-    FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
-    INDEX idx_subscription_id (subscription_id),
-    INDEX idx_movie_id (movie_id),
-    INDEX idx_role (role)
-);
-```
+-- ============================================================================
+-- 3. CONTENT MANAGEMENT
+-- ============================================================================
 
-**Purpose**: 
-- Granular access control for premium content
-- Quality restrictions based on subscription tier
-- Download permissions management
-- Role-based content restrictions
-
----
-
-## 🎬 3. Content Management
-
-Normalized, scalable content management with support for movies, series, actors, and directors.
-
-### Genres Table
-```sql
 CREATE TABLE genres (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(50) NOT NULL UNIQUE,
@@ -168,11 +101,9 @@ CREATE TABLE genres (
     deleted_at TIMESTAMP NULL,
     INDEX idx_slug (slug),
     INDEX idx_deleted_at (deleted_at)
-);
-```
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-### Actors Table
-```sql
+-- Actors table
 CREATE TABLE actors (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -184,11 +115,9 @@ CREATE TABLE actors (
     deleted_at TIMESTAMP NULL,
     INDEX idx_name (name),
     INDEX idx_deleted_at (deleted_at)
-);
-```
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-### Directors Table
-```sql
+-- Directors table
 CREATE TABLE directors (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -200,11 +129,23 @@ CREATE TABLE directors (
     deleted_at TIMESTAMP NULL,
     INDEX idx_name (name),
     INDEX idx_deleted_at (deleted_at)
-);
-```
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-### Movies/Series Table
-```sql
+-- Streaming servers
+CREATE TABLE streaming_servers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    url VARCHAR(255) NOT NULL,
+    priority INT DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    region VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    INDEX idx_is_active (is_active),
+    INDEX idx_region (region)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Movies/Series table
 CREATE TABLE movies (
     id INT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
@@ -232,19 +173,9 @@ CREATE TABLE movies (
     INDEX idx_is_premium (is_premium),
     INDEX idx_rating_avg (rating_avg),
     INDEX idx_deleted_at (deleted_at)
-);
-```
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-**Key Fields:**
-- `type`: Distinguishes between movies and series
-- `is_premium`: For subscription-restricted content
-- `content_rating`: Age-appropriate content filtering
-- `rating_avg, rating_count`: Aggregated user ratings
-
-### Many-to-Many Relationships
-
-**Movie-Genre**
-```sql
+-- Movie-Genre relationship
 CREATE TABLE movie_genres (
     movie_id INT,
     genre_id INT,
@@ -252,11 +183,9 @@ CREATE TABLE movie_genres (
     FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
     FOREIGN KEY (genre_id) REFERENCES genres(id) ON DELETE CASCADE,
     INDEX idx_genre_id (genre_id)
-);
-```
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-**Movie-Actor**
-```sql
+-- Movie-Actor relationship
 CREATE TABLE movie_actors (
     id INT AUTO_INCREMENT PRIMARY KEY,
     movie_id INT NOT NULL,
@@ -269,11 +198,9 @@ CREATE TABLE movie_actors (
     UNIQUE KEY unique_movie_actor (movie_id, actor_id),
     INDEX idx_actor_id (actor_id),
     INDEX idx_role_order (role_order)
-);
-```
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-**Movie-Director**
-```sql
+-- Movie-Director relationship
 CREATE TABLE movie_directors (
     id INT AUTO_INCREMENT PRIMARY KEY,
     movie_id INT NOT NULL,
@@ -283,11 +210,9 @@ CREATE TABLE movie_directors (
     FOREIGN KEY (director_id) REFERENCES directors(id) ON DELETE CASCADE,
     UNIQUE KEY unique_movie_director (movie_id, director_id),
     INDEX idx_director_id (director_id)
-);
-```
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-### Episodes Table (for Series)
-```sql
+-- Episodes (for series)
 CREATE TABLE episodes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     movie_id INT NOT NULL,
@@ -307,17 +232,13 @@ CREATE TABLE episodes (
     INDEX idx_season_episode (season_number, episode_number),
     INDEX idx_release_date (release_date),
     INDEX idx_deleted_at (deleted_at)
-);
-```
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
----
+-- ============================================================================
+-- 4. USER INTERACTION & PERSONALIZATION
+-- ============================================================================
 
-## ❤️ 4. User Interaction & Personalization
-
-Core features for engagement and retention.
-
-### Watchlist (My List)
-```sql
+-- Watchlist (My List)
 CREATE TABLE watchlists (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -332,16 +253,9 @@ CREATE TABLE watchlists (
     INDEX idx_user_id (user_id),
     INDEX idx_added_at (added_at),
     INDEX idx_deleted_at (deleted_at)
-);
-```
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-**Improvements over original:**
-- User can add custom ratings and notes
-- Soft delete for audit trail
-- Better indexing for fast queries
-
-### Watch History (Continue Watching)
-```sql
+-- Watch history (Continue Watching)
 CREATE TABLE watch_history (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -361,16 +275,9 @@ CREATE TABLE watch_history (
     INDEX idx_is_finished (is_finished),
     INDEX idx_updated_at (updated_at),
     INDEX idx_deleted_at (deleted_at)
-);
-```
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-**Improvements:**
-- `device_id`: Multi-device sync for resume playback
-- `ip_address`: Security & usage tracking
-- Composite index on `(user_id, episode_id)` for fast lookups
-
-### Reviews & Ratings
-```sql
+-- Reviews and Ratings
 CREATE TABLE reviews (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -388,56 +295,57 @@ CREATE TABLE reviews (
     INDEX idx_rating (rating),
     INDEX idx_is_helpful_count (is_helpful_count),
     INDEX idx_deleted_at (deleted_at)
-);
-```
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-**Features:**
-- One review per user per movie
-- Helpful count for community voting
-- Full update tracking
+-- ============================================================================
+-- 5. ACCESS CONTROL
+-- ============================================================================
 
----
+-- Content access control (granular permissions)
+CREATE TABLE content_access (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    subscription_id INT,
+    role VARCHAR(50),
+    movie_id INT,
+    can_view BOOLEAN DEFAULT FALSE,
+    can_download BOOLEAN DEFAULT FALSE,
+    max_quality ENUM('480p', '720p', '1080p', '4k') DEFAULT '1080p',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
+    FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
+    INDEX idx_subscription_id (subscription_id),
+    INDEX idx_movie_id (movie_id),
+    INDEX idx_role (role)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-## 🔐 5. Audit & Logging
+-- ============================================================================
+-- 6. AUDIT & LOGGING
+-- ============================================================================
 
-Data integrity and security tracking.
-
-### Audit Logs Table
-```sql
 CREATE TABLE audit_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
     entity_type VARCHAR(100) NOT NULL,
     entity_id INT,
-    action VARCHAR(50) NOT NULL,              -- 'CREATE', 'UPDATE', 'DELETE'
+    action VARCHAR(50) NOT NULL,
     old_value JSON,
     new_value JSON,
     description TEXT,
     ip_address VARCHAR(45),
     user_agent TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
     INDEX idx_user_id (user_id),
     INDEX idx_entity_type (entity_type),
     INDEX idx_action (action),
-    INDEX idx_created_at (created_at)
-);
-```
+    INDEX idx_created_at (created_at),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-**Use Cases:**
-- Track admin actions on content
-- User data change history
-- Security event logging
-- Compliance & regulatory reporting
+-- ============================================================================
+-- 7. VIEWS FOR COMMON QUERIES
+-- ============================================================================
 
----
-
-## ⚙️ 6. Database Views (Common Queries)
-
-Pre-optimized views for common operations:
-
-### Active Subscriptions View
-```sql
+-- Active subscriptions view
 CREATE OR REPLACE VIEW active_user_subscriptions AS
 SELECT 
     us.id,
@@ -453,10 +361,8 @@ JOIN subscriptions s ON us.subscription_id = s.id
 WHERE us.deleted_at IS NULL 
   AND us.is_active = TRUE 
   AND us.end_date > NOW();
-```
 
-### Popular Movies View
-```sql
+-- Popular movies view
 CREATE OR REPLACE VIEW popular_movies AS
 SELECT 
     m.id,
@@ -473,10 +379,8 @@ LEFT JOIN watch_history wh ON e.id = wh.episode_id AND wh.deleted_at IS NULL
 WHERE m.deleted_at IS NULL
 GROUP BY m.id
 ORDER BY total_views DESC;
-```
 
-### User Continue Watching View
-```sql
+-- User watch progress view
 CREATE OR REPLACE VIEW user_continue_watching AS
 SELECT 
     wh.id,
@@ -495,129 +399,3 @@ JOIN movies m ON e.movie_id = m.id
 WHERE wh.deleted_at IS NULL 
   AND wh.is_finished = FALSE
 ORDER BY wh.updated_at DESC;
-```
-
----
-
-## ⚡ 7. Optimization Strategies
-
-### Indexing Strategy
-
-**Critical Indexes:**
-- `users(email)` - Fast login lookups
-- `movies(title)` - Search functionality
-- `watch_history(user_id, episode_id)` - Continue watching feature
-- `episodes(movie_id, season_number, episode_number)` - Series browsing
-- `user_subscriptions(user_id, is_active, end_date)` - Access control checks
-
-### Query Optimization
-
-**Efficient Watch History Updates:**
-```sql
-INSERT INTO watch_history (user_id, episode_id, watched_time, updated_at)
-VALUES (?, ?, ?, NOW())
-ON DUPLICATE KEY UPDATE 
-  watched_time = VALUES(watched_time),
-  updated_at = NOW();
-```
-
-**Get User's Active Subscription:**
-```sql
-SELECT s.* FROM subscriptions s
-JOIN user_subscriptions us ON s.id = us.subscription_id
-WHERE us.user_id = ? 
-  AND us.deleted_at IS NULL
-  AND us.is_active = TRUE
-  AND us.end_date > NOW()
-LIMIT 1;
-```
-
-### Soft Delete Pattern
-
-All core tables include `deleted_at` column:
-```sql
--- Logical delete
-UPDATE table_name SET deleted_at = NOW() WHERE id = ?;
-
--- Recovery
-UPDATE table_name SET deleted_at = NULL WHERE id = ?;
-
--- Normal queries filter soft-deleted records
-SELECT * FROM table_name WHERE deleted_at IS NULL;
-```
-
----
-
-## 🧱 Design Highlights
-
-### ✅ Strengths
-
-- **Normalized Design**: Separate actor/director tables eliminate data redundancy
-- **Subscription Ready**: Built-in support for multiple tiers and access control
-- **Multi-device Support**: Device tracking enables seamless cross-platform experience
-- **Audit Trail**: Comprehensive logging for compliance and security
-- **Scalable**: Soft deletes and proper indexing support growth
-- **Flexible Metadata**: JSON fields for future extensibility
-
-### ⚠️ Considerations for Future
-
-- **Sharding**: For massive scale, implement horizontal partitioning by user_id
-- **Caching Layer**: Redis for session management and popular content
-- **Search Engine**: ElasticSearch integration for full-text search
-- **Analytics**: Separate data warehouse for reporting queries
-- **CDN**: CloudFront/CDN integration for media delivery
-- **Message Queue**: RabbitMQ for async audit logging
-
----
-
-## 📊 Data Model Summary
-
-```
-Users
-├── user_devices (1:N)
-├── user_subscriptions (N:M to subscriptions)
-├── watchlists (N:M to movies)
-├── watch_history (N:M to episodes)
-├── reviews (N:M to movies)
-└── audit_logs (1:N)
-
-Subscriptions
-├── content_access (1:N to movies)
-└── user_subscriptions (N:M to users)
-
-Movies
-├── movie_genres (N:M)
-├── movie_actors (N:M)
-├── movie_directors (N:M)
-├── episodes (1:N for series)
-└── reviews (1:N)
-
-Content
-├── Actors
-├── Directors
-├── Genres
-├── Episodes
-└── Streaming Servers
-```
-
----
-
-## 🚀 Deployment Recommendations
-
-1. **Backup**: Implement automated daily backups
-2. **Replication**: Set up master-slave replication for HA
-3. **Monitoring**: Use MySQL slow query log and monitoring tools
-4. **Connection Pooling**: Use ProxySQL or similar for connection management
-5. **Regular Maintenance**: Run table optimization monthly
-
----
-
-## 📌 Conclusion
-
-This schema is **production-ready** and provides:
-- Enterprise-grade security (audit logging, access control)
-- Scalability foundation (proper indexing, soft deletes)
-- User experience features (multi-device sync, personalization)
-- Business model support (subscriptions, premium content)
-
-See `schema-improved.sql` for the complete, executable schema file.
