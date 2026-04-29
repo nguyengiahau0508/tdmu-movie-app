@@ -1,623 +1,71 @@
-# 🗄️ Database Design – Movie Streaming Application (MariaDB)
-## Production-Ready Schema with Advanced Features
-
----
-
-## 📌 Overview
-
-This is a **production-ready** database design built for a scalable movie streaming system that supports:
-
-* ✅ Single movies and TV series with normalized actor/director management
-* ✅ Multi-tier subscription system with content access control
-* ✅ User personalization (watch history, favorites, ratings)
-* ✅ Multi-device synchronization for seamless experience
-* ✅ Audit logging and soft delete for data integrity
-* ✅ Scalable querying optimized for high-traffic features
-
-The schema is optimized for **MariaDB** with comprehensive indexing and is structured into logical modules.
-
----
-
-## 🧩 1. User Management
-
-Handles authentication, user data, role-based access, and multi-device tracking.
-
-### Users Table
-```sql
-CREATE TABLE users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    role ENUM('user', 'vip', 'admin') DEFAULT 'user',
-    profile_avatar VARCHAR(255),
-    bio TEXT,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP NULL,
-    INDEX idx_email (email),
-    INDEX idx_username (username),
-    INDEX idx_deleted_at (deleted_at)
-);
-```
-
-**Key Features:**
-- Soft delete support with `deleted_at`
-- Role-based access control (user, vip, admin)
-- User profile information (avatar, bio)
-- Activity tracking (created_at, updated_at)
-
-### User Devices (Multi-device Sync)
-```sql
-CREATE TABLE user_devices (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    device_id VARCHAR(255) UNIQUE NOT NULL,
-    device_name VARCHAR(100),
-    device_type ENUM('web', 'mobile', 'tablet', 'tv') DEFAULT 'web',
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_user_id (user_id),
-    INDEX idx_device_id (device_id),
-    INDEX idx_deleted_at (deleted_at)
-);
-```
-
-**Purpose**: Track user devices for:
-- Limiting concurrent streams per subscription tier
-- Resuming playback on different devices
-- Security & activity tracking
-- Device-specific preferences
-
----
-
-## 💳 2. Subscription & Access Control
-
-Multi-tier subscription system with content access control and payment tracking.
-
-### Subscriptions Table (Subscription Plans)
-```sql
-CREATE TABLE subscriptions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(50) NOT NULL,
-    description TEXT,
-    price DECIMAL(10, 2) NOT NULL,
-    currency VARCHAR(3) DEFAULT 'USD',
-    duration_days INT DEFAULT 30,
-    max_devices INT DEFAULT 1,           -- Concurrent streams
-    max_quality ENUM('480p', '720p', '1080p', '4k') DEFAULT '1080p',
-    allows_download BOOLEAN DEFAULT FALSE,
-    allows_offline BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP NULL,
-    INDEX idx_deleted_at (deleted_at)
-);
-```
-
-**Example Plans:**
-- Free (no cost, 1 device, 480p, no download)
-- Basic ($4.99/month, 1 device, 720p, download allowed)
-- Premium ($14.99/month, 4 devices, 4K, offline download)
-
-### User Subscriptions (Active Subscription Tracking)
-```sql
-CREATE TABLE user_subscriptions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    subscription_id INT NOT NULL,
-    start_date DATETIME NOT NULL,
-    end_date DATETIME NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE,
-    auto_renew BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE RESTRICT,
-    INDEX idx_user_id (user_id),
-    INDEX idx_is_active (is_active),
-    INDEX idx_end_date (end_date),
-    INDEX idx_deleted_at (deleted_at)
-);
-```
-
-### Content Access Control (Granular Permissions)
-```sql
-CREATE TABLE content_access (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    subscription_id INT,
-    role VARCHAR(50),                    -- 'user', 'vip', 'admin'
-    movie_id INT,
-    can_view BOOLEAN DEFAULT FALSE,
-    can_download BOOLEAN DEFAULT FALSE,
-    max_quality ENUM('480p', '720p', '1080p', '4k') DEFAULT '1080p',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
-    FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
-    INDEX idx_subscription_id (subscription_id),
-    INDEX idx_movie_id (movie_id),
-    INDEX idx_role (role)
-);
-```
-
-**Purpose**: 
-- Granular access control for premium content
-- Quality restrictions based on subscription tier
-- Download permissions management
-- Role-based content restrictions
-
----
-
-## 🎬 3. Content Management
-
-Normalized, scalable content management with support for movies, series, actors, and directors.
-
-### Genres Table
-```sql
-CREATE TABLE genres (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(50) NOT NULL UNIQUE,
-    slug VARCHAR(50) UNIQUE NOT NULL,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP NULL,
-    INDEX idx_slug (slug),
-    INDEX idx_deleted_at (deleted_at)
-);
-```
-
-### Actors Table
-```sql
-CREATE TABLE actors (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    bio TEXT,
-    profile_image VARCHAR(255),
-    birth_date DATE,
-    nationality VARCHAR(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP NULL,
-    INDEX idx_name (name),
-    INDEX idx_deleted_at (deleted_at)
-);
-```
-
-### Directors Table
-```sql
-CREATE TABLE directors (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    bio TEXT,
-    profile_image VARCHAR(255),
-    birth_date DATE,
-    nationality VARCHAR(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP NULL,
-    INDEX idx_name (name),
-    INDEX idx_deleted_at (deleted_at)
-);
-```
-
-### Movies/Series Table
-```sql
-CREATE TABLE movies (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    slug VARCHAR(255) UNIQUE,
-    description TEXT,
-    poster_url VARCHAR(255),
-    backdrop_url VARCHAR(255),
-    release_year INT,
-    duration INT,
-    type ENUM('single', 'series') DEFAULT 'single',
-    country VARCHAR(100),
-    studio VARCHAR(100),
-    budget DECIMAL(15, 2),
-    revenue DECIMAL(15, 2),
-    rating_avg DECIMAL(3, 1) DEFAULT 0,
-    rating_count INT DEFAULT 0,
-    content_rating ENUM('G', 'PG', 'PG-13', 'R', '16+', '18+') DEFAULT 'PG',
-    is_premium BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP NULL,
-    INDEX idx_title (title),
-    INDEX idx_slug (slug),
-    INDEX idx_type (type),
-    INDEX idx_is_premium (is_premium),
-    INDEX idx_rating_avg (rating_avg),
-    INDEX idx_deleted_at (deleted_at)
-);
-```
-
-**Key Fields:**
-- `type`: Distinguishes between movies and series
-- `is_premium`: For subscription-restricted content
-- `content_rating`: Age-appropriate content filtering
-- `rating_avg, rating_count`: Aggregated user ratings
-
-### Many-to-Many Relationships
-
-**Movie-Genre**
-```sql
-CREATE TABLE movie_genres (
-    movie_id INT,
-    genre_id INT,
-    PRIMARY KEY (movie_id, genre_id),
-    FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
-    FOREIGN KEY (genre_id) REFERENCES genres(id) ON DELETE CASCADE,
-    INDEX idx_genre_id (genre_id)
-);
-```
-
-**Movie-Actor**
-```sql
-CREATE TABLE movie_actors (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    movie_id INT NOT NULL,
-    actor_id INT NOT NULL,
-    character_name VARCHAR(255),
-    role_order INT DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
-    FOREIGN KEY (actor_id) REFERENCES actors(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_movie_actor (movie_id, actor_id),
-    INDEX idx_actor_id (actor_id),
-    INDEX idx_role_order (role_order)
-);
-```
-
-**Movie-Director**
-```sql
-CREATE TABLE movie_directors (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    movie_id INT NOT NULL,
-    director_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
-    FOREIGN KEY (director_id) REFERENCES directors(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_movie_director (movie_id, director_id),
-    INDEX idx_director_id (director_id)
-);
-```
-
-### Episodes Table (for Series)
-```sql
-CREATE TABLE episodes (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    movie_id INT NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    season_number INT NOT NULL DEFAULT 1,
-    episode_number INT NOT NULL,
-    description TEXT,
-    video_url VARCHAR(255) NOT NULL,
-    thumbnail_url VARCHAR(255),
-    duration INT,
-    release_date DATE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP NULL,
-    FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
-    INDEX idx_movie_id (movie_id),
-    INDEX idx_season_episode (season_number, episode_number),
-    INDEX idx_release_date (release_date),
-    INDEX idx_deleted_at (deleted_at)
-);
-```
-
----
-
-## ❤️ 4. User Interaction & Personalization
-
-Core features for engagement and retention.
-
-### Watchlist (My List)
-```sql
-CREATE TABLE watchlists (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    movie_id INT NOT NULL,
-    custom_rating INT CHECK (custom_rating BETWEEN 1 AND 10),
-    notes TEXT,
-    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_user_movie (user_id, movie_id),
-    INDEX idx_user_id (user_id),
-    INDEX idx_added_at (added_at),
-    INDEX idx_deleted_at (deleted_at)
-);
-```
-
-**Improvements over original:**
-- User can add custom ratings and notes
-- Soft delete for audit trail
-- Better indexing for fast queries
-
-### Watch History (Continue Watching)
-```sql
-CREATE TABLE watch_history (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    episode_id INT NOT NULL,
-    device_id VARCHAR(255),
-    watched_time INT DEFAULT 0,
-    total_duration INT,
-    is_finished BOOLEAN DEFAULT FALSE,
-    ip_address VARCHAR(45),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (episode_id) REFERENCES episodes(id) ON DELETE CASCADE,
-    INDEX idx_user_id_episode_id (user_id, episode_id),
-    INDEX idx_user_id (user_id),
-    INDEX idx_is_finished (is_finished),
-    INDEX idx_updated_at (updated_at),
-    INDEX idx_deleted_at (deleted_at)
-);
-```
-
-**Improvements:**
-- `device_id`: Multi-device sync for resume playback
-- `ip_address`: Security & usage tracking
-- Composite index on `(user_id, episode_id)` for fast lookups
-
-### Reviews & Ratings
-```sql
-CREATE TABLE reviews (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    movie_id INT NOT NULL,
-    rating INT CHECK (rating BETWEEN 1 AND 10) NOT NULL,
-    comment TEXT,
-    is_helpful_count INT DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_user_movie_review (user_id, movie_id),
-    INDEX idx_movie_id (movie_id),
-    INDEX idx_rating (rating),
-    INDEX idx_is_helpful_count (is_helpful_count),
-    INDEX idx_deleted_at (deleted_at)
-);
-```
-
-**Features:**
-- One review per user per movie
-- Helpful count for community voting
-- Full update tracking
-
----
-
-## 🔐 5. Audit & Logging
-
-Data integrity and security tracking.
-
-### Audit Logs Table
-```sql
-CREATE TABLE audit_logs (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT,
-    entity_type VARCHAR(100) NOT NULL,
-    entity_id INT,
-    action VARCHAR(50) NOT NULL,              -- 'CREATE', 'UPDATE', 'DELETE'
-    old_value JSON,
-    new_value JSON,
-    description TEXT,
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-    INDEX idx_user_id (user_id),
-    INDEX idx_entity_type (entity_type),
-    INDEX idx_action (action),
-    INDEX idx_created_at (created_at)
-);
-```
-
-**Use Cases:**
-- Track admin actions on content
-- User data change history
-- Security event logging
-- Compliance & regulatory reporting
-
----
-
-## ⚙️ 6. Database Views (Common Queries)
-
-Pre-optimized views for common operations:
-
-### Active Subscriptions View
-```sql
-CREATE OR REPLACE VIEW active_user_subscriptions AS
-SELECT 
-    us.id,
-    us.user_id,
-    s.name as subscription_name,
-    s.max_quality,
-    s.allows_download,
-    us.start_date,
-    us.end_date,
-    us.is_active
-FROM user_subscriptions us
-JOIN subscriptions s ON us.subscription_id = s.id
-WHERE us.deleted_at IS NULL 
-  AND us.is_active = TRUE 
-  AND us.end_date > NOW();
-```
-
-### Popular Movies View
-```sql
-CREATE OR REPLACE VIEW popular_movies AS
-SELECT 
-    m.id,
-    m.title,
-    m.slug,
-    m.poster_url,
-    m.rating_avg,
-    m.rating_count,
-    m.type,
-    COUNT(DISTINCT wh.user_id) as total_views
-FROM movies m
-LEFT JOIN episodes e ON m.id = e.movie_id
-LEFT JOIN watch_history wh ON e.id = wh.episode_id AND wh.deleted_at IS NULL
-WHERE m.deleted_at IS NULL
-GROUP BY m.id
-ORDER BY total_views DESC;
-```
-
-### User Continue Watching View
-```sql
-CREATE OR REPLACE VIEW user_continue_watching AS
-SELECT 
-    wh.id,
-    u.username,
-    m.title as movie_title,
-    e.episode_number,
-    e.season_number,
-    wh.watched_time,
-    e.duration,
-    ROUND((wh.watched_time / e.duration) * 100, 2) as progress_percent,
-    wh.updated_at
-FROM watch_history wh
-JOIN users u ON wh.user_id = u.id
-JOIN episodes e ON wh.episode_id = e.id
-JOIN movies m ON e.movie_id = m.id
-WHERE wh.deleted_at IS NULL 
-  AND wh.is_finished = FALSE
-ORDER BY wh.updated_at DESC;
-```
-
----
-
-## ⚡ 7. Optimization Strategies
-
-### Indexing Strategy
-
-**Critical Indexes:**
-- `users(email)` - Fast login lookups
-- `movies(title)` - Search functionality
-- `watch_history(user_id, episode_id)` - Continue watching feature
-- `episodes(movie_id, season_number, episode_number)` - Series browsing
-- `user_subscriptions(user_id, is_active, end_date)` - Access control checks
-
-### Query Optimization
-
-**Efficient Watch History Updates:**
-```sql
-INSERT INTO watch_history (user_id, episode_id, watched_time, updated_at)
-VALUES (?, ?, ?, NOW())
-ON DUPLICATE KEY UPDATE 
-  watched_time = VALUES(watched_time),
-  updated_at = NOW();
-```
-
-**Get User's Active Subscription:**
-```sql
-SELECT s.* FROM subscriptions s
-JOIN user_subscriptions us ON s.id = us.subscription_id
-WHERE us.user_id = ? 
-  AND us.deleted_at IS NULL
-  AND us.is_active = TRUE
-  AND us.end_date > NOW()
-LIMIT 1;
-```
-
-### Soft Delete Pattern
-
-All core tables include `deleted_at` column:
-```sql
--- Logical delete
-UPDATE table_name SET deleted_at = NOW() WHERE id = ?;
-
--- Recovery
-UPDATE table_name SET deleted_at = NULL WHERE id = ?;
-
--- Normal queries filter soft-deleted records
-SELECT * FROM table_name WHERE deleted_at IS NULL;
-```
-
----
-
-## 🧱 Design Highlights
-
-### ✅ Strengths
-
-- **Normalized Design**: Separate actor/director tables eliminate data redundancy
-- **Subscription Ready**: Built-in support for multiple tiers and access control
-- **Multi-device Support**: Device tracking enables seamless cross-platform experience
-- **Audit Trail**: Comprehensive logging for compliance and security
-- **Scalable**: Soft deletes and proper indexing support growth
-- **Flexible Metadata**: JSON fields for future extensibility
-
-### ⚠️ Considerations for Future
-
-- **Sharding**: For massive scale, implement horizontal partitioning by user_id
-- **Caching Layer**: Redis for session management and popular content
-- **Search Engine**: ElasticSearch integration for full-text search
-- **Analytics**: Separate data warehouse for reporting queries
-- **CDN**: CloudFront/CDN integration for media delivery
-- **Message Queue**: RabbitMQ for async audit logging
-
----
-
-## 📊 Data Model Summary
-
-```
-Users
-├── user_devices (1:N)
-├── user_subscriptions (N:M to subscriptions)
-├── watchlists (N:M to movies)
-├── watch_history (N:M to episodes)
-├── reviews (N:M to movies)
-└── audit_logs (1:N)
-
-Subscriptions
-├── content_access (1:N to movies)
-└── user_subscriptions (N:M to users)
-
-Movies
-├── movie_genres (N:M)
-├── movie_actors (N:M)
-├── movie_directors (N:M)
-├── episodes (1:N for series)
-└── reviews (1:N)
-
-Content
-├── Actors
-├── Directors
-├── Genres
-├── Episodes
-└── Streaming Servers
-```
-
----
-
-## 🚀 Deployment Recommendations
-
-1. **Backup**: Implement automated daily backups
-2. **Replication**: Set up master-slave replication for HA
-3. **Monitoring**: Use MySQL slow query log and monitoring tools
-4. **Connection Pooling**: Use ProxySQL or similar for connection management
-5. **Regular Maintenance**: Run table optimization monthly
-
----
-
-## 📌 Conclusion
-
-This schema is **production-ready** and provides:
-- Enterprise-grade security (audit logging, access control)
-- Scalability foundation (proper indexing, soft deletes)
-- User experience features (multi-device sync, personalization)
-- Business model support (subscriptions, premium content)
-
-See `schema-improved.sql` for the complete, executable schema file.
+# 🗄️ Database Design – Movie App MVP
+
+Thiết kế DB được rút gọn để phục vụ app xem phim cơ bản.
+
+## 1. Danh sách bảng
+
+1. `users`: tài khoản người dùng.
+2. `genres`: thể loại phim.
+3. `movies`: thông tin phim/series.
+4. `movie_genres`: quan hệ N-N giữa phim và thể loại.
+5. `episodes`: tập phim cho series.
+6. `watchlists`: danh sách yêu thích.
+7. `watch_history`: tiến độ xem để continue watching.
+8. `reviews`: đánh giá phim.
+
+## 2. Thiết kế chi tiết
+
+### users
+- `id`, `username`, `email`, `password_hash`, `role`, `created_at`, `updated_at`
+- `role`: `user` hoặc `admin`
+
+### genres
+- `id`, `name`, `slug`
+
+### movies
+- `id`, `title`, `slug`, `description`
+- `poster_url`, `backdrop_url`
+- `release_year`, `country`
+- `duration` (phim lẻ, phút)
+- `type` (`single` | `series`)
+- `rating_avg`, `rating_count`
+- `is_published`, `created_at`, `updated_at`
+
+### movie_genres
+- `movie_id`, `genre_id`
+- Primary key kép để tránh trùng quan hệ.
+
+### episodes
+- `id`, `movie_id`, `season_number`, `episode_number`
+- `title`, `description`
+- `duration`, `video_url`, `thumbnail_url`
+- Unique `(movie_id, season_number, episode_number)`
+
+### watchlists
+- `id`, `user_id`, `movie_id`, `created_at`
+- Unique `(user_id, movie_id)` để không thêm trùng.
+
+### watch_history
+- `id`, `user_id`, `movie_id`, `episode_id`
+- `watched_seconds`, `duration_seconds`, `is_finished`, `updated_at`
+- Unique `(user_id, movie_id, episode_id)` để update tiến độ đúng bản ghi.
+
+### reviews
+- `id`, `user_id`, `movie_id`
+- `rating` (1-10), `comment`, `created_at`, `updated_at`
+- Unique `(user_id, movie_id)` mỗi user chỉ review 1 lần/phim.
+
+## 3. Quan hệ chính
+
+- `movies` N-N `genres` qua `movie_genres`.
+- `movies` 1-N `episodes`.
+- `users` N-N `movies` qua `watchlists`.
+- `users` N-N `movies` qua `watch_history`.
+- `users` N-N `movies` qua `reviews`.
+
+## 4. Ghi chú triển khai
+
+- Không dùng soft-delete trong MVP để đơn giản hoá truy vấn.
+- Không có bảng subscription/content_access.
+- Không có bảng audit logs/user_devices ở bản này.
+- Có thể bổ sung sau khi sản phẩm có nhu cầu thực tế.
