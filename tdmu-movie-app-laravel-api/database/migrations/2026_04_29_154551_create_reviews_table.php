@@ -15,7 +15,7 @@ return new class extends Migration
             $table->increments('id');
             $table->unsignedInteger('user_id');
             $table->unsignedInteger('movie_id');
-            $table->tinyInteger('rating');
+            $table->unsignedTinyInteger('rating');
             $table->text('comment')->nullable();
             $table->timestamps();
 
@@ -27,7 +27,6 @@ return new class extends Migration
                 ->references('id')
                 ->on('movies')
                 ->cascadeOnDelete();
-            $table->check('rating BETWEEN 1 AND 10');
             $table->unique(['user_id', 'movie_id'], 'uk_reviews_user_movie');
             $table->index('movie_id', 'idx_reviews_movie');
         });
