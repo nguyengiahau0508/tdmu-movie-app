@@ -1,9 +1,18 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AIAgentService {
-  final String _baseUrl = 'http://127.0.0.1:3000/agent/chat'; // URL of NestJS Agent
+  String get _baseUrl {
+    const envUrl = String.fromEnvironment('AGENT_BASE_URL', defaultValue: '');
+    if (envUrl.isNotEmpty) return '$envUrl/agent/chat';
+
+    if (kIsWeb) {
+      return 'http://127.0.0.1:3000/agent/chat';
+    }
+    return 'http://10.0.2.2:3000/agent/chat';
+  }
   List<Map<String, String>> _history = [];
 
   Future<Map<String, dynamic>> sendChatMessage(String text) async {

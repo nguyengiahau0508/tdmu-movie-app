@@ -14,6 +14,7 @@ import 'watchlist_screen.dart';
 import 'subscription_screen.dart';
 import '../services/auth_service.dart';
 import '../widgets/voice_agent_button.dart';
+import 'watch_movie_screen.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
@@ -320,28 +321,53 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _handleAIAction(String action, Map<String, dynamic>? payload) async {
-    if (action == 'open_movie' && payload != null) {
-      final movieId = payload['movieId'];
-      if (movieId != null) {
-        // Fetch movie details
-        try {
-          final movies = await widget.movieService.fetchMovies();
-          final movie = movies.firstWhere((m) => m.id == movieId);
-          if (mounted) {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => MovieDetailScreen(
-                  movie: movie,
-                  session: widget.session,
-                  movieService: widget.movieService,
-                  userService: widget.userService,
-                ),
+    if (payload == null) return;
+    final movieId = payload['movieId'];
+    if (movieId == null) return;
+
+    try {
+      final movies = await widget.movieService.fetchMovies();
+      final movie = movies.firstWhere((m) => m.id == movieId);
+
+      if (action == 'open_movie') {
+        if (mounted) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => MovieDetailScreen(
+                movie: movie,
+                session: widget.session,
+                movieService: widget.movieService,
+                userService: widget.userService,
               ),
-            );
-          }
-        } catch (e) {
-          debugPrint('Error navigating to movie: $e');
+            ),
+          );
         }
+      } else if (action == 'open_episode') {
+        final episodeNumber = payload['episodeNumber'] ?? 1;
+        final episodes = await widget.movieService.fetchEpisodes(movieId);
+        final episode = episodes.firstWhere(
+          (ep) => ep.episodeNumber == episodeNumber,
+          orElse: () => episodes.first,
+        );
+        if (mounted) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => WatchMovieScreen(
+                movie: movie,
+                episode: episode,
+                session: widget.session,
+                userService: widget.userService,
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error handling AI action: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không tìm thấy phim hoặc tập phim yêu cầu.')),
+        );
       }
     }
   }
