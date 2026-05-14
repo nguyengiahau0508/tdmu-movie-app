@@ -30,7 +30,7 @@ class _VoiceAgentButtonState extends State<VoiceAgentButton> {
   final AIAgentService _aiAgentService = AIAgentService();
   bool _isLoading = false;
   int _freeMessageCount = 0;
-  static const int _freeMessageLimit = 5;
+  static const int _freeMessageLimit = 2;
   static const String _countKey = 'ai_chat_free_count';
   static const String _resetTimeKey = 'ai_chat_reset_time';
 
