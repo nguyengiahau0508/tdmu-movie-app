@@ -8,7 +8,9 @@ import '../models/admin_episode.dart';
 import '../models/auth_session.dart';
 import '../models/watch_history_item.dart';
 import '../services/user_service.dart';
+import '../services/auth_service.dart';
 import '../utils/url_utils.dart';
+import 'subscription_screen.dart';
 
 class WatchMovieScreen extends StatefulWidget {
   const WatchMovieScreen({
@@ -98,6 +100,10 @@ class _WatchMovieScreenState extends State<WatchMovieScreen> {
             OptionItem(
               onTap: (onTapContext) async {
                 Navigator.pop(context); // Đóng menu options
+                if (!widget.session.user.isVip) {
+                  _showVipRequiredDialog();
+                  return;
+                }
                 final selected = await showModalBottomSheet<String>(
                   context: context,
                   builder: (ctx) => ListView(
@@ -162,6 +168,45 @@ class _WatchMovieScreenState extends State<WatchMovieScreen> {
     await _initializePlayer(startAt: currentPosition, autoPlay: isPlaying);
   }
 
+  void _showVipRequiredDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.star, color: Colors.amber),
+            SizedBox(width: 8),
+            Text('Yêu cầu VIP'),
+          ],
+        ),
+        content: const Text(
+          'Chức năng thay đổi chất lượng video chỉ dành cho tài khoản VIP. '
+          'Hãy nâng cấp tài khoản để trải nghiệm chất lượng cao nhất!',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Để sau'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SubscriptionScreen(
+                    session: widget.session,
+                    authService: AuthService(),
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.star),
+            label: const Text('Nâng cấp VIP'),
+          ),
+        ],
+      ),
+    );
+  }
   Future<void> _saveProgress({bool isClosing = false}) async {
     if (_videoPlayerController == null || !_videoPlayerController!.value.isInitialized) return;
 
@@ -200,7 +245,13 @@ class _WatchMovieScreenState extends State<WatchMovieScreen> {
             PopupMenuButton<String>(
               icon: const Icon(Icons.settings, color: Colors.white),
               tooltip: 'Chất lượng',
-              onSelected: (label) => _changeQuality(label, _availableQualities[label]!),
+              onSelected: (label) {
+                if (!widget.session.user.isVip) {
+                  _showVipRequiredDialog();
+                  return;
+                }
+                _changeQuality(label, _availableQualities[label]!);
+              },
               itemBuilder: (context) => _availableQualities.keys.map((label) {
                 return PopupMenuItem(
                   value: label,

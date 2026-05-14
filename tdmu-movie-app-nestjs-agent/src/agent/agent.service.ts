@@ -22,6 +22,59 @@ export class AgentService {
     });
   }
 
+  private mapMovie(m: any) {
+    return {
+      id: m.id,
+      title: m.title,
+      slug: m.slug,
+      description: m.description,
+      poster_url: m.poster_url,
+      backdrop_url: m.backdrop_url,
+      release_year: m.release_year,
+      country: m.country,
+      duration: m.duration,
+      type: m.type,
+      rating_avg: m.rating_avg,
+      rating_count: m.rating_count,
+      is_published: m.is_published,
+      created_at: m.created_at,
+      updated_at: m.updated_at,
+      genres: m.genres?.map((g: any) => ({ id: g.id, name: g.name, slug: g.slug })) ?? [],
+    };
+  }
+
+  private mapEpisode(ep: any) {
+    return {
+      id: ep.id,
+      movie_id: ep.movie_id,
+      season_number: ep.season_number,
+      episode_number: ep.episode_number,
+      title: ep.title,
+      description: ep.description,
+      duration: ep.duration,
+      video_url: ep.video_url,
+      video_qualities: ep.video_qualities,
+      thumbnail_url: ep.thumbnail_url,
+      created_at: ep.created_at,
+      updated_at: ep.updated_at,
+    };
+  }
+
+  private mapWatchHistory(wh: any) {
+    return {
+      id: wh.id,
+      user_id: wh.user_id,
+      movie_id: wh.movie_id,
+      episode_id: wh.episode_id,
+      watched_seconds: wh.watched_seconds,
+      duration_seconds: wh.duration_seconds,
+      is_finished: wh.is_finished,
+      updated_at: wh.updated_at,
+      movie: wh.movie ? this.mapMovie(wh.movie) : null,
+      episode: wh.episode ? this.mapEpisode(wh.episode) : null,
+    };
+  }
+
   private createTools(jwtToken: string): DynamicTool[] {
     const headers = {
       Authorization: jwtToken,
@@ -32,19 +85,13 @@ export class AgentService {
       new DynamicTool({
         name: 'get_recently_watched',
         description:
-          'Get the most recently watched movie or episode by the user. Returns movieId, title, watched position in seconds, and total duration.',
+          'Get the most recently watched movies/episodes by the user. Returns full watch history with movie and episode details.',
         func: async () => {
           try {
             const response = await axios.get(`${this.apiUrl}/watch-history`, { headers });
             if (response.data && response.data.length > 0) {
-              const latest = response.data[0];
-              return JSON.stringify({
-                movieId: latest.movie_id,
-                episodeId: latest.episode_id,
-                title: latest.movie?.title ?? 'Unknown',
-                position: latest.watched_seconds,
-                duration: latest.duration_seconds,
-              });
+              const items = response.data.slice(0, 5).map((wh: any) => this.mapWatchHistory(wh));
+              return JSON.stringify(items);
             }
             return JSON.stringify({ error: 'No recently watched movies found.' });
           } catch (error) {
@@ -55,13 +102,11 @@ export class AgentService {
       }),
       new DynamicTool({
         name: 'get_highest_rated',
-        description: 'Get the highest rated movies on the system, sorted by rating descending.',
+        description: 'Get the highest rated movies on the system, sorted by rating descending. Returns full movie details including genres.',
         func: async () => {
           try {
             const response = await axios.get(`${this.apiUrl}/movies?sort=rating_desc`, { headers });
-            const movies = response.data
-              .slice(0, 5)
-              .map((m: any) => ({ id: m.id, title: m.title, rating: m.rating_avg }));
+            const movies = response.data.slice(0, 5).map((m: any) => this.mapMovie(m));
             return JSON.stringify(movies);
           } catch (error) {
             return JSON.stringify({ error: 'Failed to fetch highest rated movies.' });
@@ -70,13 +115,11 @@ export class AgentService {
       }),
       new DynamicTool({
         name: 'get_unwatched_movies',
-        description: 'Get movies that the user has never watched before.',
+        description: 'Get movies that the user has never watched before. Returns full movie details including genres.',
         func: async () => {
           try {
             const response = await axios.get(`${this.apiUrl}/movies?unwatched=true`, { headers });
-            const movies = response.data
-              .slice(0, 5)
-              .map((m: any) => ({ id: m.id, title: m.title }));
+            const movies = response.data.slice(0, 5).map((m: any) => this.mapMovie(m));
             return JSON.stringify(movies);
           } catch (error) {
             return JSON.stringify({ error: 'Failed to fetch unwatched movies.' });
@@ -85,13 +128,11 @@ export class AgentService {
       }),
       new DynamicTool({
         name: 'get_new_movies',
-        description: 'Get newly added movies on the system, sorted by newest first.',
+        description: 'Get newly added movies on the system, sorted by newest first. Returns full movie details including genres.',
         func: async () => {
           try {
             const response = await axios.get(`${this.apiUrl}/movies?sort=newest`, { headers });
-            const movies = response.data
-              .slice(0, 5)
-              .map((m: any) => ({ id: m.id, title: m.title }));
+            const movies = response.data.slice(0, 5).map((m: any) => this.mapMovie(m));
             return JSON.stringify(movies);
           } catch (error) {
             return JSON.stringify({ error: 'Failed to fetch new movies.' });
@@ -100,7 +141,7 @@ export class AgentService {
       }),
       new DynamicTool({
         name: 'get_movie_episodes',
-        description: 'Search for a movie by name and get the number of episodes it has. Input should be the movie name or keyword to search for.',
+        description: 'Search for a movie by name and get all its episodes with full details. Input should be the movie name or keyword to search for.',
         func: async (input: string) => {
           try {
             // Search for the movie by name
@@ -115,15 +156,9 @@ export class AgentService {
             const episodes = episodeRes.data || [];
 
             return JSON.stringify({
-              movieId: movie.id,
-              title: movie.title,
-              type: movie.type,
+              movie: this.mapMovie(movie),
               totalEpisodes: episodes.length,
-              episodes: episodes.map((ep: any) => ({
-                episodeNumber: ep.episode_number,
-                seasonNumber: ep.season_number,
-                title: ep.title,
-              })),
+              episodes: episodes.map((ep: any) => this.mapEpisode(ep)),
             });
           } catch (error) {
             return JSON.stringify({ error: 'Failed to fetch movie episodes.' });
@@ -162,10 +197,11 @@ ${toolDescriptions}
 After you receive a tool result, analyze the data and give a final answer.
 
 Your final answer MUST be a valid JSON object with exactly this structure (no markdown, no code fences):
-{"text": "your reply in Vietnamese", "action": "open_movie or open_episode or none", "payload": {"movieId": 123, "position": 0, "episodeNumber": 1} or null}
+{"text": "your reply in Vietnamese", "action": "open_movie or open_episode or none", "payload": {"movieId": 123, "episodeNumber": 1, "position": 0} or null}
 
+If the user asks to continue/resume watching a movie they were watching (e.g. "mở tiếp phim tôi đang xem dở", "tiếp tục xem phim"), use get_recently_watched tool, then set action to "open_episode" and include movieId, episodeNumber (from episode data), and position (from watched_seconds) in payload. Tell the user what movie and what time position they will resume from.
 If the user asks to open a recently watched movie, set action to "open_movie" and include the movieId and position from the tool result.
-If the user asks to open a specific episode of a movie (e.g. "mở phim X tập 3"), use get_movie_episodes tool first to find the movie, then set action to "open_episode" and include movieId and episodeNumber in payload.
+If the user asks to open a specific episode of a movie (e.g. "mở phim X tập 3"), use get_movie_episodes tool first to find the movie, then set action to "open_episode" and include movieId and episodeNumber in payload. Set position to 0.
 If no specific action is needed, set action to "none" and payload to null.
 Always respond in Vietnamese.`;
 

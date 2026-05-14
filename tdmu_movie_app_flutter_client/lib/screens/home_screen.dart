@@ -315,19 +315,26 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       floatingActionButton: VoiceAgentButton(
+        session: widget.session,
         onActionReceived: _handleAIAction,
       ),
     );
   }
 
   void _handleAIAction(String action, Map<String, dynamic>? payload) async {
+    debugPrint('[HomeScreen] _handleAIAction called: action=$action, payload=$payload');
     if (payload == null) return;
-    final movieId = payload['movieId'];
-    if (movieId == null) return;
+
+    final rawMovieId = payload['movieId'];
+    if (rawMovieId == null) return;
+    final int movieId = rawMovieId is int ? rawMovieId : (rawMovieId as num).toInt();
+
+    debugPrint('[HomeScreen] Looking for movieId=$movieId');
 
     try {
       final movies = await widget.movieService.fetchMovies();
       final movie = movies.firstWhere((m) => m.id == movieId);
+      debugPrint('[HomeScreen] Found movie: ${movie.title}');
 
       if (action == 'open_movie') {
         if (mounted) {
@@ -343,13 +350,32 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
       } else if (action == 'open_episode') {
-        final episodeNumber = payload['episodeNumber'] ?? 1;
+        final rawEpNum = payload['episodeNumber'] ?? 1;
+        final int episodeNumber = rawEpNum is int ? rawEpNum : (rawEpNum as num).toInt();
+        debugPrint('[HomeScreen] Looking for episode $episodeNumber of movie $movieId');
+
         final episodes = await widget.movieService.fetchEpisodes(movieId);
+        debugPrint('[HomeScreen] Found ${episodes.length} episodes');
+
         final episode = episodes.firstWhere(
           (ep) => ep.episodeNumber == episodeNumber,
           orElse: () => episodes.first,
         );
+        debugPrint('[HomeScreen] Opening episode: ${episode.title} (ep ${episode.episodeNumber})');
+
         if (mounted) {
+          // 1. Mở trang chi tiết phim trước
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => MovieDetailScreen(
+                movie: movie,
+                session: widget.session,
+                movieService: widget.movieService,
+                userService: widget.userService,
+              ),
+            ),
+          );
+          // 2. Sau đó mở trang xem phim đè lên trên
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => WatchMovieScreen(
@@ -362,8 +388,9 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('Error handling AI action: $e');
+      debugPrint('Stack trace: $stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Không tìm thấy phim hoặc tập phim yêu cầu.')),
