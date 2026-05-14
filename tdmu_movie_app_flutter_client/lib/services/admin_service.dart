@@ -227,6 +227,12 @@ class AdminService {
         }
         return;
       }
+      if (value is Map) {
+        value.forEach((k, v) {
+          fields['$key[$k]'] = '$v';
+        });
+        return;
+      }
       fields[key] = '$value';
     });
     return fields;

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class AdminEpisode {
   const AdminEpisode({
     required this.id,
@@ -24,7 +26,12 @@ class AdminEpisode {
   final String? thumbnailUrl;
 
   factory AdminEpisode.fromJson(Map<String, dynamic> json) {
-    final qualitiesRaw = json['video_qualities'];
+    dynamic qualitiesRaw = json['video_qualities'];
+    if (qualitiesRaw is String && qualitiesRaw.isNotEmpty) {
+      try {
+        qualitiesRaw = jsonDecode(qualitiesRaw);
+      } catch (_) {}
+    }
     final Map<String, String> qualities = {};
     if (qualitiesRaw is Map) {
       qualitiesRaw.forEach((key, value) {

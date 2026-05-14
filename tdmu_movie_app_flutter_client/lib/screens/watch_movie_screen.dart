@@ -58,7 +58,7 @@ class _WatchMovieScreenState extends State<WatchMovieScreen> {
     super.dispose();
   }
 
-  Future<void> _initializePlayer({Duration? startAt}) async {
+  Future<void> _initializePlayer({Duration? startAt, bool autoPlay = true}) async {
     setState(() => _loading = true);
     try {
       if (startAt == null) {
@@ -77,17 +77,49 @@ class _WatchMovieScreenState extends State<WatchMovieScreen> {
       
       await _videoPlayerController!.initialize();
 
+      final seekPosition = startAt ?? (_historyItem != null && !_historyItem!.isFinished
+          ? Duration(seconds: _historyItem!.watchedSeconds)
+          : Duration.zero);
+
+      if (seekPosition > Duration.zero) {
+        await _videoPlayerController!.seekTo(seekPosition);
+      }
+
       // 3. Khởi tạo Chewie
       _chewieController = ChewieController(
         videoPlayerController: _videoPlayerController!,
-        autoPlay: true,
+        autoPlay: autoPlay,
         looping: false,
         aspectRatio: _videoPlayerController!.value.aspectRatio,
         placeholder: Container(color: Colors.black),
-        autoInitialize: true,
-        startAt: startAt ?? (_historyItem != null && !_historyItem!.isFinished
-            ? Duration(seconds: _historyItem!.watchedSeconds)
-            : Duration.zero),
+        additionalOptions: (context) {
+          if (_availableQualities.length <= 1) return [];
+          return [
+            OptionItem(
+              onTap: (onTapContext) async {
+                Navigator.pop(context); // Đóng menu options
+                final selected = await showModalBottomSheet<String>(
+                  context: context,
+                  builder: (ctx) => ListView(
+                    shrinkWrap: true,
+                    children: _availableQualities.keys.map((label) {
+                      return ListTile(
+                        title: Text(label),
+                        trailing: _currentQuality == label ? const Icon(Icons.check, color: Colors.green) : null,
+                        onTap: () => Navigator.pop(ctx, label),
+                      );
+                    }).toList(),
+                  ),
+                );
+                if (selected != null) {
+                  _changeQuality(selected, _availableQualities[selected]!);
+                }
+              },
+              iconData: Icons.high_quality,
+              title: 'Chất lượng video',
+            ),
+          ];
+        },
       );
 
       if (mounted) {
@@ -109,16 +141,25 @@ class _WatchMovieScreenState extends State<WatchMovieScreen> {
     if (_currentQuality == label) return;
 
     final currentPosition = _videoPlayerController?.value.position;
+    final isPlaying = _videoPlayerController?.value.isPlaying ?? true;
     
-    // Dispose cũ
-    await _videoPlayerController?.dispose();
-    _chewieController?.dispose();
+    final oldVideoPlayerController = _videoPlayerController;
+    final oldChewieController = _chewieController;
 
     setState(() {
       _currentQuality = label;
+      _loading = true;
+      _chewieController = null;
+      _videoPlayerController = null;
     });
 
-    await _initializePlayer(startAt: currentPosition);
+    // Delay một chút để Flutter gỡ Chewie widget cũ khỏi cây giao diện
+    await Future.delayed(const Duration(milliseconds: 50));
+
+    oldChewieController?.dispose();
+    await oldVideoPlayerController?.dispose();
+
+    await _initializePlayer(startAt: currentPosition, autoPlay: isPlaying);
   }
 
   Future<void> _saveProgress({bool isClosing = false}) async {

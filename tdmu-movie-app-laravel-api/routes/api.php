@@ -15,7 +15,43 @@ Route::get('media/{path}', function (string $path) {
     if (!\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
         abort(404);
     }
-    return \Illuminate\Support\Facades\Storage::disk('public')->response($path);
+    
+    $fullPath = \Illuminate\Support\Facades\Storage::disk('public')->path($path);
+    $size = filesize($fullPath);
+    $mime = mime_content_type($fullPath) ?: 'application/octet-stream';
+    
+    $headers = [
+        'Content-Type' => $mime,
+        'Accept-Ranges' => 'bytes',
+    ];
+
+    if (request()->hasHeader('Range')) {
+        $range = request()->header('Range');
+        preg_match('/bytes=(\d+)-(\d*)/', $range, $matches);
+        $start = intval($matches[1] ?? 0);
+        $end = (isset($matches[2]) && $matches[2] !== '') ? intval($matches[2]) : $size - 1;
+        
+        $length = $end - $start + 1;
+        $headers['Content-Range'] = "bytes $start-$end/$size";
+        $headers['Content-Length'] = $length;
+        
+        return response()->stream(function () use ($fullPath, $start, $end) {
+            $stream = fopen($fullPath, 'rb');
+            fseek($stream, $start);
+            $buffer = 1024 * 8; // 8KB chunks
+            $pos = $start;
+            while (!feof($stream) && $pos <= $end) {
+                $read = min($buffer, $end - $pos + 1);
+                echo fread($stream, $read);
+                flush();
+                $pos += $read;
+            }
+            fclose($stream);
+        }, 206, $headers);
+    }
+
+    $headers['Content-Length'] = $size;
+    return response()->file($fullPath, $headers);
 })->where('path', '.*');
 
 Route::prefix('auth')->group(function (): void {

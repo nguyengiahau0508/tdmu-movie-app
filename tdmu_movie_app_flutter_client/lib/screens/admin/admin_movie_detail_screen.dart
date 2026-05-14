@@ -82,6 +82,11 @@ class _AdminMovieDetailScreenState extends State<AdminMovieDetailScreen> {
     final formKey = GlobalKey<FormState>();
 
     void disposeAll() {
+      seasonCtrl.dispose();
+      episodeCtrl.dispose();
+      titleCtrl.dispose();
+      videoCtrl.dispose();
+      thumbnailCtrl.dispose();
       for (final ctrls in qualityCtrls) {
         ctrls.label.dispose();
         ctrls.url.dispose();
@@ -181,7 +186,11 @@ class _AdminMovieDetailScreenState extends State<AdminMovieDetailScreen> {
                                   ),
                                   IconButton(
                                     onPressed: () => setLocalState(() {
-                                      qualityCtrls.removeAt(index);
+                                      final removed = qualityCtrls.removeAt(index);
+                                      Future.delayed(const Duration(milliseconds: 300), () {
+                                        removed.label.dispose();
+                                        removed.url.dispose();
+                                      });
                                     }),
                                     icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
                                   ),
@@ -204,9 +213,15 @@ class _AdminMovieDetailScreenState extends State<AdminMovieDetailScreen> {
                                     label: const Text('Tải file lên'),
                                   ),
                                   if (ctrls.file != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(left: 8.0),
-                                      child: Text(ctrls.file!.name, style: const TextStyle(fontSize: 12)),
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(left: 8.0),
+                                        child: Text(
+                                          ctrls.file!.name,
+                                          style: const TextStyle(fontSize: 12),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
                                     ),
                                 ],
                               ),
@@ -266,7 +281,6 @@ class _AdminMovieDetailScreenState extends State<AdminMovieDetailScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              disposeAll();
               Navigator.pop(context, false);
             },
             child: const Text('Hủy'),
@@ -284,7 +298,7 @@ class _AdminMovieDetailScreenState extends State<AdminMovieDetailScreen> {
     );
 
     if (confirmed != true) {
-      disposeAll();
+      Future.delayed(const Duration(milliseconds: 300), disposeAll);
       return;
     }
 
@@ -313,10 +327,10 @@ class _AdminMovieDetailScreenState extends State<AdminMovieDetailScreen> {
           payload['quality_file_${label.replaceAll(' ', '_')}'] = q.file!;
         }
       }
-      q.label.dispose();
-      q.url.dispose();
     }
     payload['video_qualities'] = qualitiesMap;
+
+    Future.delayed(const Duration(milliseconds: 300), disposeAll);
 
     if (videoFile != null) payload['video_file'] = videoFile;
     if (thumbnailFile != null) payload['thumbnail_file'] = thumbnailFile;
