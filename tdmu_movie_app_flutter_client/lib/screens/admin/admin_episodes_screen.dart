@@ -1,11 +1,11 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
-import '../../config/api_config.dart';
 import '../../models/admin_episode.dart';
-import '../../models/admin_movie.dart';
+import '../../models/movie.dart';
 import '../../services/admin_service.dart';
 import '../../utils/upload_file_picker.dart';
+import '../../utils/url_utils.dart';
 
 class AdminEpisodesScreen extends StatefulWidget {
   const AdminEpisodesScreen({super.key, required this.service});
@@ -19,7 +19,7 @@ class AdminEpisodesScreen extends StatefulWidget {
 class _AdminEpisodesScreenState extends State<AdminEpisodesScreen> {
   bool _loading = true;
   List<AdminEpisode> _episodes = const [];
-  List<AdminMovie> _movies = const [];
+  List<Movie> _movies = const [];
 
   @override
   void initState() {
@@ -37,7 +37,7 @@ class _AdminEpisodesScreenState extends State<AdminEpisodesScreen> {
       if (!mounted) return;
       setState(() {
         _episodes = results[0] as List<AdminEpisode>;
-        _movies = results[1] as List<AdminMovie>;
+        _movies = results[1] as List<Movie>;
       });
     } on Exception catch (e) {
       _showMessage(e.toString());
@@ -46,17 +46,6 @@ class _AdminEpisodesScreenState extends State<AdminEpisodesScreen> {
         setState(() => _loading = false);
       }
     }
-  }
-
-  String _normalizeUrl(String? url) {
-    if (url == null || url.isEmpty) return '';
-    final apiBase = ApiConfig.baseUrl;
-    if (apiBase.contains('10.0.2.2')) {
-      return url
-          .replaceAll('localhost', '10.0.2.2')
-          .replaceAll('127.0.0.1', '10.0.2.2');
-    }
-    return url;
   }
 
   Future<void> _openForm([AdminEpisode? episode]) async {
@@ -326,7 +315,7 @@ class _AdminEpisodesScreenState extends State<AdminEpisodesScreen> {
       );
     } else if (url != null && url.isNotEmpty) {
       image = Image.network(
-        _normalizeUrl(url),
+        UrlUtils.normalizeUrl(url),
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => const Icon(Icons.broken_image),
       );
@@ -369,7 +358,7 @@ class _AdminEpisodesScreenState extends State<AdminEpisodesScreen> {
               separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (_, index) {
                 final episode = _episodes[index];
-                final thumbnailUrl = _normalizeUrl(episode.thumbnailUrl);
+                final thumbnailUrl = UrlUtils.normalizeUrl(episode.thumbnailUrl);
 
                 return ListTile(
                   leading: Container(

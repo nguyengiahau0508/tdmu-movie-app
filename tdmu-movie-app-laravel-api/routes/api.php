@@ -11,6 +11,13 @@ use App\Http\Controllers\WatchHistoryController;
 use App\Http\Controllers\WatchlistController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('media/{path}', function (string $path) {
+    if (!\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+        abort(404);
+    }
+    return \Illuminate\Support\Facades\Storage::disk('public')->response($path);
+})->where('path', '.*');
+
 Route::prefix('auth')->group(function (): void {
     Route::post('register', [AuthController::class, 'register']);
     Route::post('login', [AuthController::class, 'login']);
@@ -21,14 +28,18 @@ Route::prefix('auth')->group(function (): void {
     });
 });
 
+Route::middleware('auth.jwt')->group(function (): void {
+    Route::apiResource('watchlists', WatchlistController::class);
+    Route::apiResource('watch-history', WatchHistoryController::class)
+        ->parameters(['watch-history' => 'watchHistory']);
+    Route::apiResource('reviews', ReviewController::class)->except(['index', 'show']);
+});
+
 Route::apiResource('users', UserController::class);
 Route::apiResource('genres', GenreController::class)->only(['index', 'show']);
 Route::apiResource('movies', MovieController::class)->only(['index', 'show']);
 Route::apiResource('episodes', EpisodeController::class)->only(['index', 'show']);
-Route::apiResource('watchlists', WatchlistController::class);
-Route::apiResource('watch-history', WatchHistoryController::class)
-    ->parameters(['watch-history' => 'watchHistory']);
-Route::apiResource('reviews', ReviewController::class);
+Route::apiResource('reviews', ReviewController::class)->only(['index', 'show']);
 
 Route::middleware(['auth.jwt', 'admin'])->prefix('admin')->group(function (): void {
     Route::apiResource('genres', GenreController::class)->except(['index', 'show']);

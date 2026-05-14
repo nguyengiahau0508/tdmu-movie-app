@@ -33,4 +33,14 @@ class Movie extends Model
             'updated_at' => 'datetime',
         ];
     }
+
+    public function genres()
+    {
+        return $this->belongsToMany(Genre::class, 'movie_genres');
+    }
+
+    public function episodes()
+    {
+        return $this->hasMany(Episode::class);
+    }
 }

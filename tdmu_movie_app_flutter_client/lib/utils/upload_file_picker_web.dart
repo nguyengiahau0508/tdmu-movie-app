@@ -1,54 +1,41 @@
-// ignore_for_file: deprecated_member_use, avoid_web_libraries_in_flutter
-
-import 'dart:async';
-import 'dart:html' as html;
-import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 
 import 'upload_file_picker.dart';
 
-Future<PickedUploadFile?> pickImageFile() {
-  return _pickFile(accept: 'image/*');
+Future<PickedUploadFile?> pickImageFile() async {
+  final result = await FilePicker.platform.pickFiles(
+    type: FileType.image,
+    allowMultiple: false,
+    withData: true,
+  );
+  if (result == null || result.files.isEmpty) {
+    return null;
+  }
+
+  final file = result.files.first;
+  final bytes = file.bytes;
+  if (bytes == null) {
+    return null;
+  }
+
+  return PickedUploadFile(name: file.name, bytes: bytes);
 }
 
-Future<PickedUploadFile?> pickVideoFile() {
-  return _pickFile(accept: 'video/*');
-}
+Future<PickedUploadFile?> pickVideoFile() async {
+  final result = await FilePicker.platform.pickFiles(
+    type: FileType.video,
+    allowMultiple: false,
+    withData: true,
+  );
+  if (result == null || result.files.isEmpty) {
+    return null;
+  }
 
-Future<PickedUploadFile?> _pickFile({required String accept}) {
-  final completer = Completer<PickedUploadFile?>();
-  final input = html.FileUploadInputElement()..accept = accept;
+  final file = result.files.first;
+  final bytes = file.bytes;
+  if (bytes == null) {
+    return null;
+  }
 
-  input.onChange.listen((_) {
-    final files = input.files;
-    if (files == null || files.isEmpty) {
-      completer.complete(null);
-      return;
-    }
-
-    final file = files.first;
-    final reader = html.FileReader();
-
-    reader.onLoadEnd.listen((_) {
-      final result = reader.result;
-      if (result is! ByteBuffer) {
-        completer.complete(null);
-        return;
-      }
-
-      completer.complete(
-        PickedUploadFile(name: file.name, bytes: Uint8List.view(result)),
-      );
-    });
-
-    reader.onError.listen((_) {
-      completer.completeError(
-        Exception('Không thể đọc tệp ${file.name} trên trình duyệt.'),
-      );
-    });
-
-    reader.readAsArrayBuffer(file);
-  });
-
-  input.click();
-  return completer.future;
+  return PickedUploadFile(name: file.name, bytes: bytes);
 }

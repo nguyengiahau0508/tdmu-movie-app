@@ -4,6 +4,8 @@ import 'models/auth_session.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
 import 'services/auth_service.dart';
+import 'services/movie_service.dart';
+import 'services/user_service.dart';
 
 void main() {
   runApp(MovieApp());
@@ -13,10 +15,16 @@ class MovieApp extends StatefulWidget {
   MovieApp({
     super.key,
     AuthService? authService,
+    MovieService? movieService,
+    UserService? userService,
     this.restoreSessionOnStart = true,
-  }) : authService = authService ?? AuthService();
+  })  : authService = authService ?? AuthService(),
+        movieService = movieService ?? MovieService(),
+        userService = userService ?? UserService();
 
   final AuthService authService;
+  final MovieService movieService;
+  final UserService userService;
   final bool restoreSessionOnStart;
 
   @override
@@ -25,6 +33,8 @@ class MovieApp extends StatefulWidget {
 
 class _MovieAppState extends State<MovieApp> {
   late final AuthService _authService;
+  late final MovieService _movieService;
+  late final UserService _userService;
   AuthSession? _session;
   late bool _isBootstrapping;
 
@@ -32,6 +42,8 @@ class _MovieAppState extends State<MovieApp> {
   void initState() {
     super.initState();
     _authService = widget.authService;
+    _movieService = widget.movieService;
+    _userService = widget.userService;
     _isBootstrapping = widget.restoreSessionOnStart;
 
     if (widget.restoreSessionOnStart) {
@@ -80,7 +92,12 @@ class _MovieAppState extends State<MovieApp> {
                       });
                     },
                   )
-                : HomeScreen(session: _session!, onLogout: _onLoggedOut)),
+                : HomeScreen(
+                    session: _session!,
+                    movieService: _movieService,
+                    userService: _userService,
+                    onLogout: _onLoggedOut,
+                  )),
     );
   }
 }

@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import '../models/admin_episode.dart';
 import '../models/admin_genre.dart';
-import '../models/admin_movie.dart';
+import '../models/movie.dart';
 import '../utils/upload_file_picker.dart';
 
 class AdminService {
@@ -16,10 +16,10 @@ class AdminService {
   final http.Client _client;
   final String _baseUrl = ApiConfig.baseUrl;
 
-  Future<List<AdminMovie>> fetchMovies() async {
+  Future<List<Movie>> fetchMovies() async {
     final response = await _client.get(Uri.parse('$_baseUrl/movies'));
     final list = _asList(response);
-    return list.map(AdminMovie.fromJson).toList();
+    return list.map(Movie.fromJson).toList();
   }
 
   Future<List<AdminGenre>> fetchGenres() async {
@@ -186,12 +186,27 @@ class AdminService {
     if (body.isEmpty) {
       return fallback;
     }
-    final dynamic decoded = jsonDecode(body);
-    if (decoded is Map<String, dynamic>) {
-      final message = decoded['message'];
-      if (message is String && message.isNotEmpty) {
-        return message;
+    try {
+      final dynamic decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        // Nếu có lỗi validation chi tiết
+        if (decoded['errors'] is Map<String, dynamic>) {
+          final errors = decoded['errors'] as Map<String, dynamic>;
+          if (errors.isNotEmpty) {
+            final firstError = errors.values.first;
+            if (firstError is List && firstError.isNotEmpty) {
+              return firstError.first.toString();
+            }
+          }
+        }
+
+        final message = decoded['message'];
+        if (message is String && message.isNotEmpty) {
+          return message;
+        }
       }
+    } catch (_) {
+      // Bỏ qua lỗi parse JSON
     }
     return fallback;
   }
@@ -206,6 +221,12 @@ class AdminService {
         fields[key] = value ? '1' : '0';
         return;
       }
+      if (value is List) {
+        for (var i = 0; i < value.length; i++) {
+          fields['$key[$i]'] = '${value[i]}';
+        }
+        return;
+      }
       fields[key] = '$value';
     });
     return fields;
@@ -218,6 +239,14 @@ class AdminService {
         files[key] = value;
       }
     });
+
+    // Xử lý các file chất lượng được gắn label
+    payload.forEach((key, value) {
+      if (key.startsWith('quality_file_') && value is PickedUploadFile) {
+        files[key] = value;
+      }
+    });
+    
     return files;
   }
 }

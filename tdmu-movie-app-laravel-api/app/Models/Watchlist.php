@@ -21,4 +21,9 @@ class Watchlist extends Model
             'created_at' => 'datetime',
         ];
     }
+
+    public function movie()
+    {
+        return $this->belongsTo(Movie::class);
+    }
 }

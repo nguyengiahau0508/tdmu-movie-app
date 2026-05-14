@@ -31,4 +31,14 @@ class WatchHistory extends Model
             'updated_at' => 'datetime',
         ];
     }
+
+    public function movie()
+    {
+        return $this->belongsTo(Movie::class);
+    }
+
+    public function episode()
+    {
+        return $this->belongsTo(Episode::class);
+    }
 }

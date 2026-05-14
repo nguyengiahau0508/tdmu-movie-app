@@ -1,5 +1,7 @@
-class AdminMovie {
-  const AdminMovie({
+import 'admin_genre.dart';
+
+class Movie {
+  const Movie({
     required this.id,
     required this.title,
     required this.slug,
@@ -13,6 +15,7 @@ class AdminMovie {
     required this.ratingAvg,
     required this.ratingCount,
     required this.isPublished,
+    this.genres = const [],
   });
 
   final int id;
@@ -28,11 +31,13 @@ class AdminMovie {
   final double? ratingAvg;
   final int? ratingCount;
   final bool isPublished;
+  final List<AdminGenre> genres;
 
-  factory AdminMovie.fromJson(Map<String, dynamic> json) {
+  factory Movie.fromJson(Map<String, dynamic> json) {
     final rawRating = json['rating_avg'];
+    final rawGenres = json['genres'] as List<dynamic>?;
 
-    return AdminMovie(
+    return Movie(
       id: (json['id'] as num).toInt(),
       title: (json['title'] as String?) ?? '',
       slug: (json['slug'] as String?) ?? '',
@@ -48,6 +53,9 @@ class AdminMovie {
           : double.tryParse('$rawRating'),
       ratingCount: (json['rating_count'] as num?)?.toInt(),
       isPublished: json['is_published'] == true || json['is_published'] == 1,
+      genres: rawGenres != null
+          ? rawGenres.map((g) => AdminGenre.fromJson(g)).toList()
+          : const [],
     );
   }
 }

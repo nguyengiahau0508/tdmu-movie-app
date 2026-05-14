@@ -7,70 +7,65 @@ use Illuminate\Http\Request;
 
 class ReviewController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return Review::query()->orderBy('id')->get();
+        $query = Review::query();
+
+        if ($request->filled('movie_id')) {
+            $query->where('movie_id', $request->input('movie_id'));
+        }
+
+        return $query->with('user')->orderBy('created_at', 'desc')->get();
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
-            'user_id' => ['required', 'integer', 'exists:users,id'],
             'movie_id' => ['required', 'integer', 'exists:movies,id'],
             'rating' => ['required', 'integer', 'between:1,10'],
             'comment' => ['nullable', 'string'],
         ]);
 
-        $exists = Review::query()
-            ->where('user_id', $data['user_id'])
-            ->where('movie_id', $data['movie_id'])
-            ->exists();
-        if ($exists) {
-            return response()->json([
-                'message' => 'The user has already reviewed this movie.',
-            ], 422);
-        }
-
-        $review = Review::create($data);
+        $review = Review::updateOrCreate(
+            [
+                'user_id' => $request->user()->id,
+                'movie_id' => $data['movie_id'],
+            ],
+            [
+                'rating' => $data['rating'],
+                'comment' => $data['comment'],
+            ]
+        );
 
         return response()->json($review, 201);
     }
 
     public function show(Review $review)
     {
-        return $review;
+        return $review->load('user');
     }
 
     public function update(Request $request, Review $review)
     {
+        if ($review->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
         $data = $request->validate([
-            'user_id' => ['sometimes', 'required', 'integer', 'exists:users,id'],
-            'movie_id' => ['sometimes', 'required', 'integer', 'exists:movies,id'],
             'rating' => ['sometimes', 'required', 'integer', 'between:1,10'],
             'comment' => ['nullable', 'string'],
         ]);
-
-        $userId = $data['user_id'] ?? $review->user_id;
-        $movieId = $data['movie_id'] ?? $review->movie_id;
-
-        $exists = Review::query()
-            ->where('user_id', $userId)
-            ->where('movie_id', $movieId)
-            ->where('id', '!=', $review->id)
-            ->exists();
-        if ($exists) {
-            return response()->json([
-                'message' => 'The user has already reviewed this movie.',
-            ], 422);
-        }
 
         $review->update($data);
 
         return $review;
     }
 
-    public function destroy(Review $review)
+    public function destroy(Review $review, Request $request)
     {
+        if ($review->user_id !== $request->user()->id) {
+            abort(403);
+        }
         $review->delete();
 
         return response()->noContent();

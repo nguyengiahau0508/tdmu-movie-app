@@ -11,9 +11,39 @@ class MovieController extends Controller
 {
     public function __construct(private readonly MediaStorageService $mediaStorage) {}
 
-    public function index()
+    public function index(Request $request)
     {
-        return Movie::query()->orderBy('id')->get();
+        $query = Movie::query();
+
+        // Admin might want to see all, but users should only see published ones
+        // For simplicity in this MVP, we can just show published to everyone on public index
+        if (!$request->user() || $request->user()->role !== 'admin') {
+            $query->where('is_published', true);
+        }
+
+        if ($request->filled('q')) {
+            $query->where(function ($q) use ($request) {
+                $q->where('title', 'like', '%' . $request->input('q') . '%')
+                  ->orWhere('description', 'like', '%' . $request->input('q') . '%');
+            });
+        }
+
+        if ($request->filled('genre')) {
+            $query->whereHas('genres', function ($q) use ($request) {
+                $genre = $request->input('genre');
+                if (is_numeric($genre)) {
+                    $q->where('genres.id', $genre);
+                } else {
+                    $q->where('genres.slug', $genre);
+                }
+            });
+        }
+
+        if ($request->filled('type')) {
+            $query->where('type', $request->input('type'));
+        }
+
+        return $query->with('genres')->orderBy('id', 'desc')->get();
     }
 
     public function store(Request $request)
@@ -33,6 +63,8 @@ class MovieController extends Controller
             'rating_avg' => ['sometimes', 'numeric', 'between:0,10'],
             'rating_count' => ['sometimes', 'integer', 'min:0'],
             'is_published' => ['sometimes', 'boolean'],
+            'genres' => ['sometimes', 'array'],
+            'genres.*' => ['integer', 'exists:genres,id'],
         ]);
 
         if ($request->hasFile('poster_file')) {
@@ -42,16 +74,18 @@ class MovieController extends Controller
             $data['backdrop_url'] = $this->mediaStorage->storeUploadedFile($request->file('backdrop_file'), 'movies/backdrops');
         }
 
-        unset($data['poster_file'], $data['backdrop_file']);
+        $genres = $data['genres'] ?? [];
+        unset($data['poster_file'], $data['backdrop_file'], $data['genres']);
 
         $movie = Movie::create($data);
+        $movie->genres()->sync($genres);
 
-        return response()->json($movie, 201);
+        return response()->json($movie->load('genres'), 201);
     }
 
     public function show(Movie $movie)
     {
-        return $movie;
+        return $movie->load('genres');
     }
 
     public function update(Request $request, Movie $movie)
@@ -71,6 +105,8 @@ class MovieController extends Controller
             'rating_avg' => ['sometimes', 'numeric', 'between:0,10'],
             'rating_count' => ['sometimes', 'integer', 'min:0'],
             'is_published' => ['sometimes', 'boolean'],
+            'genres' => ['sometimes', 'array'],
+            'genres.*' => ['integer', 'exists:genres,id'],
         ]);
 
         if ($request->hasFile('poster_file')) {
@@ -88,11 +124,15 @@ class MovieController extends Controller
             );
         }
 
-        unset($data['poster_file'], $data['backdrop_file']);
+        if ($request->has('genres')) {
+            $movie->genres()->sync($request->input('genres'));
+        }
+
+        unset($data['poster_file'], $data['backdrop_file'], $data['genres']);
 
         $movie->update($data);
 
-        return $movie;
+        return $movie->load('genres');
     }
 
     public function destroy(Movie $movie)

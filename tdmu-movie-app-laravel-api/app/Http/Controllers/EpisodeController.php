@@ -10,9 +10,17 @@ class EpisodeController extends Controller
 {
     public function __construct(private readonly MediaStorageService $mediaStorage) {}
 
-    public function index()
+    public function index(Request $request)
     {
-        return Episode::query()->orderBy('id')->get();
+        $query = Episode::query();
+
+        if ($request->filled('movie_id')) {
+            $query->where('movie_id', $request->input('movie_id'));
+        }
+
+        return $query->orderBy('season_number')
+            ->orderBy('episode_number')
+            ->get();
     }
 
     public function store(Request $request)
@@ -25,6 +33,7 @@ class EpisodeController extends Controller
             'description' => ['nullable', 'string'],
             'duration' => ['nullable', 'integer', 'min:0'],
             'video_url' => ['required_without:video_file', 'string', 'max:500'],
+            'video_qualities' => ['sometimes', 'array'],
             'thumbnail_url' => ['nullable', 'string', 'max:500'],
             'video_file' => ['required_without:video_url', 'file', 'mimes:mp4,mov,mkv,webm', 'max:512000'],
             'thumbnail_file' => ['nullable', 'file', 'image', 'max:10240'],
@@ -37,6 +46,18 @@ class EpisodeController extends Controller
         }
         if ($request->hasFile('thumbnail_file')) {
             $data['thumbnail_url'] = $this->mediaStorage->storeUploadedFile($request->file('thumbnail_file'), 'episodes/thumbnails');
+        }
+
+        // Xử lý upload file cho từng chất lượng
+        $qualities = $request->input('video_qualities', []);
+        if (is_array($qualities)) {
+            foreach ($qualities as $label => $url) {
+                $fileKey = 'quality_file_' . str_replace(' ', '_', $label);
+                if ($request->hasFile($fileKey)) {
+                    $qualities[$label] = $this->mediaStorage->storeUploadedFile($request->file($fileKey), 'episodes/videos/' . $label);
+                }
+            }
+            $data['video_qualities'] = $qualities;
         }
 
         unset($data['video_file'], $data['thumbnail_file']);
@@ -72,6 +93,7 @@ class EpisodeController extends Controller
             'description' => ['nullable', 'string'],
             'duration' => ['nullable', 'integer', 'min:0'],
             'video_url' => ['sometimes', 'required', 'string', 'max:500'],
+            'video_qualities' => ['sometimes', 'array'],
             'thumbnail_url' => ['nullable', 'string', 'max:500'],
             'video_file' => ['nullable', 'file', 'mimes:mp4,mov,mkv,webm', 'max:512000'],
             'thumbnail_file' => ['nullable', 'file', 'image', 'max:10240'],
@@ -106,6 +128,25 @@ class EpisodeController extends Controller
                 $request->file('thumbnail_file'),
                 'episodes/thumbnails'
             );
+        }
+
+        // Xử lý upload file cho từng chất lượng
+        if ($request->has('video_qualities')) {
+            $qualities = $request->input('video_qualities', []);
+            $oldQualities = $episode->video_qualities ?? [];
+            
+            foreach ($qualities as $label => $url) {
+                $fileKey = 'quality_file_' . str_replace(' ', '_', $label);
+                if ($request->hasFile($fileKey)) {
+                    // Xóa file cũ nếu có nhãn trùng
+                    $oldUrl = $oldQualities[$label] ?? null;
+                    if ($oldUrl) {
+                        $this->mediaStorage->deleteByUrl($oldUrl);
+                    }
+                    $qualities[$label] = $this->mediaStorage->storeUploadedFile($request->file($fileKey), 'episodes/videos/' . $label);
+                }
+            }
+            $data['video_qualities'] = $qualities;
         }
 
         unset($data['video_file'], $data['thumbnail_file']);

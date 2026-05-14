@@ -14,6 +14,7 @@ class Episode extends Model
         'description',
         'duration',
         'video_url',
+        'video_qualities',
         'thumbnail_url',
     ];
 
@@ -24,6 +25,7 @@ class Episode extends Model
             'season_number' => 'integer',
             'episode_number' => 'integer',
             'duration' => 'integer',
+            'video_qualities' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 
 import 'upload_file_picker.dart';
@@ -13,7 +14,12 @@ Future<PickedUploadFile?> pickImageFile() async {
   }
 
   final file = result.files.first;
-  final bytes = file.bytes;
+  List<int>? bytes = file.bytes;
+
+  if (bytes == null && file.path != null) {
+    bytes = await File(file.path!).readAsBytes();
+  }
+
   if (bytes == null) {
     return null;
   }
@@ -32,7 +38,12 @@ Future<PickedUploadFile?> pickVideoFile() async {
   }
 
   final file = result.files.first;
-  final bytes = file.bytes;
+  List<int>? bytes = file.bytes;
+
+  if (bytes == null && file.path != null) {
+    bytes = await File(file.path!).readAsBytes();
+  }
+
   if (bytes == null) {
     return null;
   }

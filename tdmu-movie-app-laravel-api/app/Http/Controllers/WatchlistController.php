@@ -7,66 +7,53 @@ use Illuminate\Http\Request;
 
 class WatchlistController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return Watchlist::query()->orderBy('id')->get();
+        return Watchlist::where('user_id', $request->user()->id)->with('movie')->get();
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
-            'user_id' => ['required', 'integer', 'exists:users,id'],
             'movie_id' => ['required', 'integer', 'exists:movies,id'],
         ]);
 
-        $exists = Watchlist::query()
-            ->where('user_id', $data['user_id'])
-            ->where('movie_id', $data['movie_id'])
-            ->exists();
-        if ($exists) {
-            return response()->json([
-                'message' => 'The movie is already in the user watchlist.',
-            ], 422);
-        }
-
-        $watchlist = Watchlist::create($data);
+        $watchlist = Watchlist::firstOrCreate([
+            'user_id' => $request->user()->id,
+            'movie_id' => $data['movie_id'],
+        ]);
 
         return response()->json($watchlist, 201);
     }
 
-    public function show(Watchlist $watchlist)
+    public function show(Watchlist $watchlist, Request $request)
     {
+        if ($watchlist->user_id !== $request->user()->id) {
+            abort(403);
+        }
         return $watchlist;
     }
 
     public function update(Request $request, Watchlist $watchlist)
     {
-        $data = $request->validate([
-            'user_id' => ['sometimes', 'required', 'integer', 'exists:users,id'],
-            'movie_id' => ['sometimes', 'required', 'integer', 'exists:movies,id'],
-        ]);
-
-        $userId = $data['user_id'] ?? $watchlist->user_id;
-        $movieId = $data['movie_id'] ?? $watchlist->movie_id;
-
-        $exists = Watchlist::query()
-            ->where('user_id', $userId)
-            ->where('movie_id', $movieId)
-            ->where('id', '!=', $watchlist->id)
-            ->exists();
-        if ($exists) {
-            return response()->json([
-                'message' => 'The movie is already in the user watchlist.',
-            ], 422);
+        if ($watchlist->user_id !== $request->user()->id) {
+            abort(403);
         }
+
+        $data = $request->validate([
+            'movie_id' => ['required', 'integer', 'exists:movies,id'],
+        ]);
 
         $watchlist->update($data);
 
         return $watchlist;
     }
 
-    public function destroy(Watchlist $watchlist)
+    public function destroy(Watchlist $watchlist, Request $request)
     {
+        if ($watchlist->user_id !== $request->user()->id) {
+            abort(403);
+        }
         $watchlist->delete();
 
         return response()->noContent();

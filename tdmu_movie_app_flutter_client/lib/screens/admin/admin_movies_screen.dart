@@ -1,10 +1,13 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
-import '../../config/api_config.dart';
-import '../../models/admin_movie.dart';
+import '../../models/movie.dart';
+import '../../models/admin_genre.dart';
 import '../../services/admin_service.dart';
 import '../../utils/upload_file_picker.dart';
+import '../../utils/url_utils.dart';
+
+import 'admin_movie_detail_screen.dart';
 
 class AdminMoviesScreen extends StatefulWidget {
   const AdminMoviesScreen({super.key, required this.service});
@@ -17,7 +20,7 @@ class AdminMoviesScreen extends StatefulWidget {
 
 class _AdminMoviesScreenState extends State<AdminMoviesScreen> {
   bool _loading = true;
-  List<AdminMovie> _movies = const [];
+  List<Movie> _movies = const [];
 
   @override
   void initState() {
@@ -40,19 +43,7 @@ class _AdminMoviesScreenState extends State<AdminMoviesScreen> {
     }
   }
 
-  String _normalizeUrl(String? url) {
-    if (url == null || url.isEmpty) return '';
-    // Xử lý localhost/127.0.0.1 cho Android emulator
-    final apiBase = ApiConfig.baseUrl;
-    if (apiBase.contains('10.0.2.2')) {
-      return url
-          .replaceAll('localhost', '10.0.2.2')
-          .replaceAll('127.0.0.1', '10.0.2.2');
-    }
-    return url;
-  }
-
-  Future<void> _openForm([AdminMovie? movie]) async {
+  Future<void> _openForm([Movie? movie]) async {
     final titleCtrl = TextEditingController(text: movie?.title ?? '');
     final slugCtrl = TextEditingController(text: movie?.slug ?? '');
     final descriptionCtrl = TextEditingController(
@@ -72,6 +63,15 @@ class _AdminMoviesScreenState extends State<AdminMoviesScreen> {
     String type = movie?.type ?? 'single';
     bool isPublished = movie?.isPublished ?? true;
     final formKey = GlobalKey<FormState>();
+
+    // Lấy danh sách thể loại
+    List<AdminGenre> allGenres = [];
+    List<int> selectedGenreIds = movie?.genres.map((g) => g.id).toList() ?? [];
+    try {
+      allGenres = await widget.service.fetchGenres();
+    } catch (e) {
+      debugPrint('Lỗi tải thể loại: $e');
+    }
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -154,6 +154,29 @@ class _AdminMoviesScreenState extends State<AdminMoviesScreen> {
                                   setLocalState(() => isPublished = value),
                               contentPadding: EdgeInsets.zero,
                               title: const Text('Hiển thị (published)'),
+                            ),
+                            const Divider(height: 24),
+                            Text('Thể loại', style: Theme.of(context).textTheme.titleSmall),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              children: allGenres.map((genre) {
+                                final isSelected = selectedGenreIds.contains(genre.id);
+                                return FilterChip(
+                                  label: Text(genre.name, style: const TextStyle(fontSize: 12)),
+                                  selected: isSelected,
+                                  onSelected: (selected) {
+                                    setLocalState(() {
+                                      if (selected) {
+                                        selectedGenreIds.add(genre.id);
+                                      } else {
+                                        selectedGenreIds.remove(genre.id);
+                                      }
+                                    });
+                                  },
+                                );
+                              }).toList(),
                             ),
                           ],
                         ),
@@ -352,6 +375,7 @@ class _AdminMoviesScreenState extends State<AdminMoviesScreen> {
       'duration': _nullableInt(durationCtrl.text),
       'type': type,
       'is_published': isPublished,
+      'genres': selectedGenreIds,
     };
     if (posterFile != null) {
       payload['poster_file'] = posterFile!;
@@ -372,7 +396,7 @@ class _AdminMoviesScreenState extends State<AdminMoviesScreen> {
     }
   }
 
-  Future<void> _delete(AdminMovie movie) async {
+  Future<void> _delete(Movie movie) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -407,115 +431,15 @@ class _AdminMoviesScreenState extends State<AdminMoviesScreen> {
     );
   }
 
-  Future<void> _openDetail(AdminMovie movie) async {
-    final posterUrl = _normalizeUrl(movie.posterUrl);
-    final backdropUrl = _normalizeUrl(movie.backdropUrl);
-
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(movie.title),
-        content: SizedBox(
-          width: 500,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (posterUrl.isNotEmpty)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          posterUrl,
-                          height: 240,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const Icon(
-                            Icons.broken_image,
-                            size: 100,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                _detailRow('ID', '${movie.id}'),
-                _detailRow('Slug', movie.slug),
-                _detailRow('Loại', movie.type),
-                _detailRow('Published', movie.isPublished ? 'true' : 'false'),
-                _detailRow('Năm phát hành', '${movie.releaseYear ?? '-'}'),
-                _detailRow('Quốc gia', movie.country ?? '-'),
-                _detailRow('Thời lượng', '${movie.duration ?? '-'}'),
-                _detailRow('Điểm trung bình', '${movie.ratingAvg ?? '-'}'),
-                _detailRow('Số lượt đánh giá', '${movie.ratingCount ?? '-'}'),
-                _detailRow('Poster URL', movie.posterUrl ?? '-'),
-                _detailRow('Backdrop URL', movie.backdropUrl ?? '-'),
-                _detailRow('Mô tả', movie.description ?? '-'),
-                if (backdropUrl.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Backdrop:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      backdropUrl,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(
-                        height: 100,
-                        color: Colors.grey[200],
-                        child: const Icon(
-                          Icons.broken_image,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Đóng'),
-          ),
-          FilledButton.icon(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              await _openForm(movie);
-            },
-            icon: const Icon(Icons.edit_outlined),
-            label: const Text('Sửa'),
-          ),
-        ],
+  Future<void> _openDetail(Movie movie) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AdminMovieDetailScreen(movie: movie, service: widget.service),
       ),
     );
+    _load(); // Refresh movies if needed (e.g. if movie info could change there, though currently it doesn't)
   }
 
-  Widget _detailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: RichText(
-        text: TextSpan(
-          style: const TextStyle(color: Colors.black87, fontSize: 14),
-          children: [
-            TextSpan(
-              text: '$label: ',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            TextSpan(text: value),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _sectionCard(
     BuildContext context, {
@@ -548,7 +472,7 @@ class _AdminMoviesScreenState extends State<AdminMoviesScreen> {
       image = Image.memory(Uint8List.fromList(file.bytes), fit: BoxFit.cover);
     } else if (url != null && url.isNotEmpty) {
       image = Image.network(
-        _normalizeUrl(url),
+        UrlUtils.normalizeUrl(url),
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => const Icon(Icons.broken_image),
       );
@@ -626,7 +550,7 @@ class _AdminMoviesScreenState extends State<AdminMoviesScreen> {
               separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (_, index) {
                 final movie = _movies[index];
-                final posterUrl = _normalizeUrl(movie.posterUrl);
+                final posterUrl = UrlUtils.normalizeUrl(movie.posterUrl);
 
                 return ListTile(
                   onTap: () => _openDetail(movie),
