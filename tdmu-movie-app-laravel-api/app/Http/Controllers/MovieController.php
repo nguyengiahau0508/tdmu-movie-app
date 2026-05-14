@@ -43,7 +43,23 @@ class MovieController extends Controller
             $query->where('type', $request->input('type'));
         }
 
-        return $query->with('genres')->orderBy('id', 'desc')->get();
+        if ($request->filled('unwatched') && $request->boolean('unwatched') && $request->user()) {
+            $query->whereDoesntHave('watchHistories', function ($q) use ($request) {
+                $q->where('user_id', $request->user()->id);
+            });
+        }
+
+        if ($request->filled('sort')) {
+            if ($request->input('sort') === 'rating_desc') {
+                $query->orderBy('rating_avg', 'desc');
+            } elseif ($request->input('sort') === 'newest') {
+                $query->orderBy('id', 'desc');
+            }
+        } else {
+            $query->orderBy('id', 'desc');
+        }
+
+        return $query->with('genres')->get();
     }
 
     public function store(Request $request)

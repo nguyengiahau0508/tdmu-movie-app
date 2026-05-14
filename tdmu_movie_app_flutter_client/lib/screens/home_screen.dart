@@ -11,7 +11,9 @@ import 'admin/admin_dashboard_screen.dart';
 import 'movie_detail_screen.dart';
 import 'watch_history_screen.dart';
 import 'watchlist_screen.dart';
-
+import 'subscription_screen.dart';
+import '../services/auth_service.dart';
+import '../widgets/voice_agent_button.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
@@ -138,6 +140,21 @@ class _HomeScreenState extends State<HomeScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).primaryColor,
               ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.star, color: Colors.amber),
+              title: const Text('Nâng cấp VIP'),
+              onTap: () {
+                Navigator.pop(context); // Đóng drawer
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => SubscriptionScreen(
+                      session: widget.session,
+                      authService: AuthService(),
+                    ),
+                  ),
+                );
+              },
             ),
             ListTile(
               leading: const Icon(Icons.history),
@@ -296,7 +313,37 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+      floatingActionButton: VoiceAgentButton(
+        onActionReceived: _handleAIAction,
+      ),
     );
+  }
+
+  void _handleAIAction(String action, Map<String, dynamic>? payload) async {
+    if (action == 'open_movie' && payload != null) {
+      final movieId = payload['movieId'];
+      if (movieId != null) {
+        // Fetch movie details
+        try {
+          final movies = await widget.movieService.fetchMovies();
+          final movie = movies.firstWhere((m) => m.id == movieId);
+          if (mounted) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => MovieDetailScreen(
+                  movie: movie,
+                  session: widget.session,
+                  movieService: widget.movieService,
+                  userService: widget.userService,
+                ),
+              ),
+            );
+          }
+        } catch (e) {
+          debugPrint('Error navigating to movie: $e');
+        }
+      }
+    }
   }
 }
 

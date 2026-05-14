@@ -9,6 +9,7 @@ use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WatchHistoryController;
 use App\Http\Controllers\WatchlistController;
+use App\Http\Controllers\PaymentController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('media/{path}', function (string $path) {
@@ -69,7 +70,10 @@ Route::middleware('auth.jwt')->group(function (): void {
     Route::apiResource('watch-history', WatchHistoryController::class)
         ->parameters(['watch-history' => 'watchHistory']);
     Route::apiResource('reviews', ReviewController::class)->except(['index', 'show']);
+    Route::post('payment/momo/create', [PaymentController::class, 'createPayment']);
 });
+
+Route::post('payment/momo/ipn', [PaymentController::class, 'ipn']);
 
 Route::apiResource('users', UserController::class);
 Route::apiResource('genres', GenreController::class)->only(['index', 'show']);
