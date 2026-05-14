@@ -432,7 +432,7 @@ class _AdminMoviesScreenState extends State<AdminMoviesScreen> {
                           posterUrl,
                           height: 240,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const Icon(
+                          errorBuilder: (_, _, _) => const Icon(
                             Icons.broken_image,
                             size: 100,
                             color: Colors.grey,
@@ -455,7 +455,10 @@ class _AdminMoviesScreenState extends State<AdminMoviesScreen> {
                 _detailRow('Mô tả', movie.description ?? '-'),
                 if (backdropUrl.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  const Text('Backdrop:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Backdrop:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 8),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
@@ -463,10 +466,13 @@ class _AdminMoviesScreenState extends State<AdminMoviesScreen> {
                       backdropUrl,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      errorBuilder: (_, _, _) => Container(
                         height: 100,
                         color: Colors.grey[200],
-                        child: const Icon(Icons.broken_image, color: Colors.grey),
+                        child: const Icon(
+                          Icons.broken_image,
+                          color: Colors.grey,
+                        ),
                       ),
                     ),
                   ),
@@ -539,15 +545,12 @@ class _AdminMoviesScreenState extends State<AdminMoviesScreen> {
   }) {
     Widget? image;
     if (file != null) {
-      image = Image.memory(
-        Uint8List.fromList(file.bytes),
-        fit: BoxFit.cover,
-      );
+      image = Image.memory(Uint8List.fromList(file.bytes), fit: BoxFit.cover);
     } else if (url != null && url.isNotEmpty) {
       image = Image.network(
         _normalizeUrl(url),
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+        errorBuilder: (_, _, _) => const Icon(Icons.broken_image),
       );
     }
 
@@ -640,7 +643,7 @@ class _AdminMoviesScreenState extends State<AdminMoviesScreen> {
                             child: Image.network(
                               posterUrl,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
+                              errorBuilder: (_, _, _) =>
                                   const Icon(Icons.broken_image, size: 20),
                             ),
                           )

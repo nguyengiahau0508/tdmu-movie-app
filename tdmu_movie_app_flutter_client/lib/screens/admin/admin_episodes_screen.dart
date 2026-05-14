@@ -328,7 +328,7 @@ class _AdminEpisodesScreenState extends State<AdminEpisodesScreen> {
       image = Image.network(
         _normalizeUrl(url),
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+        errorBuilder: (_, _, _) => const Icon(Icons.broken_image),
       );
     }
 
@@ -385,7 +385,7 @@ class _AdminEpisodesScreenState extends State<AdminEpisodesScreen> {
                             child: Image.network(
                               thumbnailUrl,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
+                              errorBuilder: (_, _, _) =>
                                   const Icon(Icons.broken_image, size: 20),
                             ),
                           )
